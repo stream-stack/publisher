@@ -14,6 +14,8 @@ import (
 	"time"
 )
 
+const OffsetPrefix = `offset_`
+
 type subscribe struct {
 	Name              string `json:"name"`
 	Url               string `json:"url"`
@@ -84,7 +86,7 @@ func (s *subscribe) start(ctx context.Context) {
 				if err != nil {
 					s.recordEvent(v12.EventTypeWarning, err.Error(), "RecvError", s.Name)
 					logrus.Errorf("subscribe[%s] recv data error:%v", s.Name, err)
-					time.Sleep(recvDuration)
+					time.Sleep(recvRetryDuration)
 				}
 				s.recordEvent(v12.EventTypeNormal, "beginRecvSuccess", "beginRecv", s.Name)
 				if recv != nil {
@@ -104,8 +106,8 @@ func (s *subscribe) stop() {
 
 func (s *subscribe) startAck(ctx context.Context, cli protocol.KVServiceClient) {
 	s.ackCh = make(chan uint64, 1)
-	//todo:时间设置
-	ticker := time.NewTicker(time.Second * 5)
+	key := []byte(OffsetPrefix + s.Name)
+	ticker := time.NewTicker(ackDuration)
 	defer ticker.Stop()
 	var prev uint64
 	var offset uint64
@@ -127,7 +129,7 @@ func (s *subscribe) startAck(ctx context.Context, cli protocol.KVServiceClient) 
 			continue
 		}
 		put, err := cli.Put(ctx, &protocol.PutRequest{
-			Key: []byte(s.Name),
+			Key: key,
 			Val: protocol.Uint64ToBytes(offset),
 		})
 		if err != nil {
