@@ -21,4 +21,4 @@ require (
 
 replace github.com/stream-stack/store v0.0.0-20211223063433-55f67d6f769f => ../store
 
-replace github.com/Jille/grpc-multi-resolver v1.0.0 => github.com/killzoner/grpc-multi-resolver v1.0.0
+replace github.com/Jille/grpc-multi-resolver v1.0.0 => github.com/killzoner/grpc-multi-resolver v1.0.1-0.20211029185255-4677b640f9ac

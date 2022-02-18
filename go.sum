@@ -64,8 +64,6 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/DataDog/datadog-go v2.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
-github.com/Jille/grpc-multi-resolver v1.0.0 h1:wqaMHLDpaNNV9qr3NTC76EzfOYfoov3EpF8XqU37+G8=
-github.com/Jille/grpc-multi-resolver v1.0.0/go.mod h1:2RAAhSVfe+0pON+CxFTMbnRkJgmJXjxsUCWxnHVd6AE=
 github.com/Jille/raft-grpc-leader-rpc v1.1.0/go.mod h1:l+pK+uPuqpFDFcPmyUPSng4257UXrST0Vc3Lo4XwVB0=
 github.com/Jille/raft-grpc-transport v1.1.0/go.mod h1:/utjkfBnPBc8/6vfJKJW/rGbjJps8/g05YbhppZr/eo=
 github.com/Jille/raftadmin v1.2.0/go.mod h1:vtVEpToPGTUPVwwunypWDpi69JpdnHMhWRUlc/65U+Y=
@@ -435,7 +433,10 @@ github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7V
 github.com/julienschmidt/httprouter v1.3.0/go.mod h1:JR6WtHb+2LUe8TCKY3cZOxFyyO8IZAc4RVcycCCAKdM=
 github.com/kelseyhightower/envconfig v1.4.0 h1:Im6hONhd3pLkfDFsbRgu68RDNkGF1r3dvMUtDTo2cv8=
 github.com/kelseyhightower/envconfig v1.4.0/go.mod h1:cccZRl6mQpaq41TPp5QxidR+Sa3axMbJDNb//FQX6Gg=
+github.com/killzoner/grpc-multi-resolver v1.0.0 h1:kI8mPPepI7O1fWnIAvyz2mECs2bGnaVOPvMhQi1/eMY=
 github.com/killzoner/grpc-multi-resolver v1.0.0/go.mod h1:2RAAhSVfe+0pON+CxFTMbnRkJgmJXjxsUCWxnHVd6AE=
+github.com/killzoner/grpc-multi-resolver v1.0.1-0.20211029185255-4677b640f9ac h1:o9lgglGNSc+PkJZsiS449A+07esJ5kkqlQKo/5O1lQQ=
+github.com/killzoner/grpc-multi-resolver v1.0.1-0.20211029185255-4677b640f9ac/go.mod h1:LuzaiIvoYqYEJ9z6Zrge0pEOwTO/A2VdQJwWg+vVhcc=
 github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvWXihfKN4Q=
 github.com/kisielk/errcheck v1.2.0/go.mod h1:/BMXB+zMLi60iA8Vv6Ksmxu/1UDYcXs4uQLJ+jE2L00=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
