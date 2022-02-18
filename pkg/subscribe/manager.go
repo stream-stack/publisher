@@ -2,7 +2,6 @@ package subscribe
 
 import (
 	"context"
-	"fmt"
 	_ "github.com/Jille/grpc-multi-resolver"
 	grpc_retry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/sirupsen/logrus"
@@ -45,12 +44,12 @@ type Operation func(map[string]*subscribe)
 var OperationCh = make(chan Operation)
 
 func StartManager(ctx context.Context) error {
-	serviceConfig := `{"healthCheckConfig": {"serviceName": ""}, "loadBalancingConfig": [ { "round_robin": {} } ]}`
+	serviceConfig := `{"healthCheckConfig": {"serviceName": "store"}, "loadBalancingConfig": [ { "round_robin": {} } ]}`
 	retryOpts := []grpc_retry.CallOption{
 		grpc_retry.WithBackoff(grpc_retry.BackoffExponential(100 * time.Millisecond)),
 		grpc_retry.WithMax(5),
 	}
-	conn, err := grpc.Dial(fmt.Sprintf(`multi:///%s`, config.Address),
+	conn, err := grpc.Dial(config.Address,
 		grpc.WithDefaultServiceConfig(serviceConfig), grpc.WithInsecure(),
 		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 		grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(retryOpts...)))
