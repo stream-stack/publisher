@@ -1,0 +1,5 @@
+FROM ubuntu:latest
+WORKDIR /
+COPY cmd/publisher .
+
+CMD ["/publisher"]

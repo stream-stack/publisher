@@ -3,7 +3,7 @@ module github.com/stream-stack/publisher
 go 1.16
 
 require (
-	github.com/Jille/grpc-multi-resolver v1.0.0
+	github.com/Jille/grpc-multi-resolver v1.1.0
 	github.com/cloudevents/sdk-go/v2 v2.8.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/sirupsen/logrus v1.8.1
@@ -11,7 +11,7 @@ require (
 	github.com/spf13/viper v1.7.1
 	github.com/stream-stack/store v0.0.0-20211223063433-55f67d6f769f
 	golang.org/x/sys v0.0.0-20211210111614-af8b64212486 // indirect
-	google.golang.org/grpc v1.42.0
+	google.golang.org/grpc v1.44.0
 	k8s.io/api v0.22.5
 	k8s.io/apimachinery v0.22.5
 	k8s.io/client-go v0.22.5
@@ -20,5 +20,3 @@ require (
 )
 
 replace github.com/stream-stack/store v0.0.0-20211223063433-55f67d6f769f => ../store
-
-replace github.com/Jille/grpc-multi-resolver v1.0.0 => github.com/killzoner/grpc-multi-resolver v1.0.1-0.20211029185255-4677b640f9ac
