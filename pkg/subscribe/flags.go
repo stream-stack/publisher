@@ -2,7 +2,7 @@ package subscribe
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/stream-stack/store/pkg/config"
+	"github.com/stream-stack/publisher/pkg/config"
 	"time"
 )
 
