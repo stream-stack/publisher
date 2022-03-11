@@ -10,12 +10,12 @@ COPY go.sum go.sum
 RUN go mod download
 
 # Copy the go source
-COPY main.go main.go
 COPY cmd/ cmd/
 COPY pkg/ pkg/
 
+ENV GOPROXY="https://goproxy.io,direct"
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o publisher main.go
+RUN CGO_ENABLED=0 go build -a -o publisher cmd/main.go
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
