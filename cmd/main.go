@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/stream-stack/publisher/pkg/config"
+	"github.com/stream-stack/publisher/pkg/storeset"
 	"github.com/stream-stack/publisher/pkg/subscribe"
 	"os"
 	"os/signal"
@@ -26,15 +27,22 @@ func NewCommand() (*cobra.Command, context.Context, context.CancelFunc) {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := subscribe.StartManager(ctx); err != nil {
+			//if err := subscribe.StartManager(ctx); err != nil {
+			//	return err
+			//}
+
+			if err := storeset.StartXdsServer(ctx); err != nil {
 				return err
 			}
-
+			if err := storeset.StartStoreSetManager(ctx); err != nil {
+				return err
+			}
 			<-ctx.Done()
 			return nil
 		},
 	}
 	subscribe.InitFlags()
+	storeset.InitFlags()
 	config.InitFlags()
 
 	viper.AutomaticEnv()
