@@ -12,6 +12,7 @@ require (
 	github.com/stream-stack/store v0.0.0-20211223063433-55f67d6f769f
 	golang.org/x/sys v0.0.0-20211210111614-af8b64212486 // indirect
 	google.golang.org/grpc v1.44.0
+	google.golang.org/protobuf v1.27.1
 	k8s.io/api v0.22.5
 	k8s.io/apimachinery v0.22.5
 	k8s.io/client-go v0.22.5

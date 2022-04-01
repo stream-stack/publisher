@@ -13,7 +13,11 @@ type XdsServer struct {
 }
 
 func (x *XdsServer) SubscriberPush(ctx context.Context, request *proto.SubscriberPushRequest) (*proto.SubscriberPushResponse, error) {
-	panic("implement me")
+	for _, subscribe := range request.Subscribes {
+		//TODO:待完善字段
+		subscribeAddCh <- Subscribe{name: subscribe.Name}
+	}
+	return &proto.SubscriberPushResponse{}, nil
 }
 
 func (x *XdsServer) StoreSetPush(ctx context.Context, request *proto.StoreSetPushRequest) (*proto.StoreSetPushResponse, error) {
@@ -46,8 +50,11 @@ func StartXdsServer(ctx context.Context) error {
 			s.GracefulStop()
 		}
 	}()
-	if err := s.Serve(sock); err != nil {
-		return fmt.Errorf("failed to serve: %v", err)
-	}
+	go func() {
+		if err := s.Serve(sock); err != nil {
+			panic(err)
+		}
+	}()
+
 	return nil
 }
