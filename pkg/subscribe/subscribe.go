@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 	v12 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"strconv"
 	"time"
 )
 
@@ -168,7 +169,7 @@ func (s *subscribe) startSender(ctx context.Context) error {
 			case data := <-s.dataCh:
 				e := cloudevents.NewEvent()
 				e.SetType(data.StreamName)
-				e.SetSource(data.EventId)
+				e.SetSource(strconv.FormatUint(data.EventId, 10))
 				_ = e.SetData(cloudevents.ApplicationJSON, data.Data)
 
 				logrus.Printf("准备发送%d 数据 %+v 至 url: %s", data.Offset, e.String(), s.Url)
