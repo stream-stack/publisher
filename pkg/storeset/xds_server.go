@@ -14,8 +14,21 @@ type XdsServer struct {
 
 func (x *XdsServer) SubscriberPush(ctx context.Context, request *proto.SubscriberPushRequest) (*proto.SubscriberPushResponse, error) {
 	for _, subscribe := range request.Subscribes {
+		StoreSetOpCh <- func(ctx context.Context, conns map[string]*StoreSetConn) {
+			for _, conn := range conns {
+				conn.RunnerOpCh <- func(ctx context.Context, runners map[string]*SubscriberRunner) {
+					runner, ok := runners[subscribe.Name]
+					if !ok {
+						//TODO:保存已有的订阅者
+						runner = NewSubscribeRunner(subscribe, conn.conn)
+						runners[subscribe.Name] = runner
+						go runner.Start(ctx)
+					}
+					//TODO:订阅更新地址等信息
+				}
+			}
+		}
 		//TODO:待完善字段
-		subscribeAddCh <- Subscribe{name: subscribe.Name}
 	}
 	return &proto.SubscriberPushResponse{}, nil
 }
@@ -23,10 +36,9 @@ func (x *XdsServer) SubscriberPush(ctx context.Context, request *proto.Subscribe
 func (x *XdsServer) StoreSetPush(ctx context.Context, request *proto.StoreSetPushRequest) (*proto.StoreSetPushResponse, error) {
 	var err error
 	for _, store := range request.Stores {
-		name := formatStoreName(store)
-		AddStoreSetCh <- AddStoreSet{
-			name: name,
-			uris: store.Uris,
+		StoreSetOpCh <- func(ctx context.Context, conns map[string]*StoreSetConn) {
+			getOrCreateConn(ctx, conns, store)
+			//TODO:根据已有的 订阅, 启动runner
 		}
 	}
 	return &proto.StoreSetPushResponse{}, err

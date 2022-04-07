@@ -2,35 +2,18 @@ package storeset
 
 import "context"
 
-var subscribeAddCh = make(chan Subscribe, 1)
-var subscribeRemoveCh = make(chan Subscribe, 1)
+var StoreSetOpCh = make(chan func(ctx context.Context, conns map[string]*StoreSetConn), 1)
+var storesetConns = make(map[string]*StoreSetConn)
 
-func StartStoreSetManager(ctx context.Context) error {
+func StartStoreSetManager(ctx context.Context) {
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case add := <-AddStoreSetCh:
-				_, ok := storesetConns[add.name]
-				if ok {
-					continue
-				}
-				conn := NewStoreSetConn(add)
-				storesetConns[add.name] = conn
-				go conn.Start(ctx)
-			case rm := <-RemoveStoreSetCh:
-				delete(storesetConns, rm)
-			case add := <-subscribeAddCh:
-				for _, conn := range storesetConns {
-					conn.addSubscribeCh <- add
-				}
-			case remove := <-subscribeRemoveCh:
-				for _, conn := range storesetConns {
-					conn.removeSubscribeCh <- remove.name
-				}
+			case op := <-StoreSetOpCh:
+				op(ctx, storesetConns)
 			}
 		}
 	}()
-	return nil
 }
