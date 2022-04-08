@@ -49,6 +49,7 @@ func getOrCreateConn(ctx context.Context, conns map[string]*StoreSetConn, store 
 	name := formatStoreName(store)
 	conn, ok := conns[name]
 	if ok {
+		logrus.Debugf(`connection exist,return`)
 		return conn
 	}
 	conn = &StoreSetConn{
@@ -71,8 +72,9 @@ func (c *StoreSetConn) Stop() {
 }
 
 func (c *StoreSetConn) Start(ctx context.Context) {
+	logrus.Debugf(`start storeset connection %s,uris: %v`, c.name, c.uris)
 	c.ctx, c.cancelFunc = context.WithCancel(ctx)
-
+	c.RunnerOpCh = make(chan func(ctx context.Context, runners map[string]*SubscriberRunner), 1)
 	for {
 		select {
 		case <-c.ctx.Done():
@@ -84,19 +86,32 @@ func (c *StoreSetConn) Start(ctx context.Context) {
 				time.Sleep(connectionRetryDuration)
 				continue
 			}
+			c.startExistRunner(ctx)
 			c.doWork(c.ctx)
 		}
 	}
 }
 
 func (c *StoreSetConn) doWork(ctx context.Context) {
-	c.RunnerOpCh = make(chan func(ctx context.Context, runners map[string]*SubscriberRunner), 1)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case op := <-c.RunnerOpCh:
 			op(c.ctx, c.runners)
+		}
+	}
+}
+
+func (c *StoreSetConn) startExistRunner(ctx context.Context) {
+	for s, subscribe := range subscribes {
+		runner, ok := c.runners[s]
+		logrus.Debugf(`start exist subscribe %s for connection %s`, s, c.name)
+		if !ok {
+			logrus.Debugf(`subscribe %s not exist for connection %s, create and start`, s, c.name)
+			runner = NewSubscribeRunner(subscribe, c.conn)
+			c.runners[subscribe.Name] = runner
+			go runner.Start(ctx)
 		}
 	}
 }

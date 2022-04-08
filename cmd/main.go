@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/stream-stack/publisher/pkg/config"
@@ -26,9 +27,8 @@ func NewCommand() (*cobra.Command, context.Context, context.CancelFunc) {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := storeset.StartStoreSetManager(ctx); err != nil {
-				return err
-			}
+			logrus.SetLevel(logrus.TraceLevel)
+			storeset.StartStoreSetManager(ctx)
 			if err := storeset.StartXdsServer(ctx); err != nil {
 				return err
 			}

@@ -15,11 +15,11 @@ type XdsServer struct {
 func (x *XdsServer) SubscriberPush(ctx context.Context, request *proto.SubscriberPushRequest) (*proto.SubscriberPushResponse, error) {
 	for _, subscribe := range request.Subscribes {
 		StoreSetOpCh <- func(ctx context.Context, conns map[string]*StoreSetConn) {
+			subscribes[subscribe.Name] = subscribe
 			for _, conn := range conns {
 				conn.RunnerOpCh <- func(ctx context.Context, runners map[string]*SubscriberRunner) {
 					runner, ok := runners[subscribe.Name]
 					if !ok {
-						//TODO:保存已有的订阅者
 						runner = NewSubscribeRunner(subscribe, conn.conn)
 						runners[subscribe.Name] = runner
 						go runner.Start(ctx)
@@ -38,7 +38,6 @@ func (x *XdsServer) StoreSetPush(ctx context.Context, request *proto.StoreSetPus
 	for _, store := range request.Stores {
 		StoreSetOpCh <- func(ctx context.Context, conns map[string]*StoreSetConn) {
 			getOrCreateConn(ctx, conns, store)
-			//TODO:根据已有的 订阅, 启动runner
 		}
 	}
 	return &proto.StoreSetPushResponse{}, err

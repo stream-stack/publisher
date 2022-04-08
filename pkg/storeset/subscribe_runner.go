@@ -17,9 +17,7 @@ import (
 	"time"
 )
 
-type Subscribe struct {
-	name string
-}
+var subscribes = make(map[string]*proto.Subscribe)
 
 type SubscribeSink struct {
 	Uri string
@@ -62,10 +60,13 @@ func (r *SubscriberRunner) Start(ctx context.Context) {
 		case <-r.ctx.Done():
 			return
 		default:
+			logrus.Debugf(`begin load subscribe offset key %s`, string(r.subscribeName))
 			get, err := kvServiceClient.Get(ctx, &protocol.GetRequest{Key: r.subscribeName})
 			if err != nil {
+				logrus.Debugf(`load subscribe offset key %s, error:%v`, string(r.subscribeName), err)
 				convert := status.Convert(err)
 				if convert.Code() == codes.NotFound {
+					logrus.Debugf(`load subscribe offset key %s, error is NotFound,set offset=1`, string(r.subscribeName))
 					offset = 1
 				} else {
 					logrus.Errorf("load subscribe[%s] offset error:%v", r.subscribeName, err)
@@ -73,8 +74,10 @@ func (r *SubscriberRunner) Start(ctx context.Context) {
 				}
 			} else {
 				offset = protocol.BytesToUint64(get.Data) + 1
+				logrus.Debugf(`load subscribe offset key %s, value %d`, string(r.subscribeName), offset)
 			}
 
+			logrus.Debugf(`begin eventServiceClient subscribe`)
 			subscribe, err := eventServiceClient.Subscribe(r.ctx, &protocol.SubscribeRequest{
 				SubscribeId: hostname,
 				Regexp:      "streamName == '" + streamName + "'",
@@ -92,6 +95,7 @@ func (r *SubscriberRunner) Start(ctx context.Context) {
 }
 
 func (r *SubscriberRunner) doRecv(subscribe protocol.EventService_SubscribeClient) {
+	logrus.Debugf(`begin recv`)
 	for {
 		select {
 		case <-r.ctx.Done():
@@ -115,6 +119,7 @@ func (r *SubscriberRunner) doRecv(subscribe protocol.EventService_SubscribeClien
 }
 
 func (r *SubscriberRunner) startAck(cli protocol.KVServiceClient) {
+	logrus.Debugf(`start subscribe ack`)
 	r.ackCh = make(chan uint64, 1)
 	ticker := time.NewTicker(ackDuration)
 	defer ticker.Stop()
@@ -170,13 +175,10 @@ func (r *SubscriberRunner) sendCloudEvent(recv *protocol.ReadResponse) error {
 	e := cloudevents.NewEvent()
 	err = e.UnmarshalJSON(recv.Data)
 	if err != nil {
+		logrus.Errorf(`unmarshal cloudevent error:%v`, err)
 		return err
 	}
-	//e.SetID(strconv.FormatUint(recv.EventId,10))
-	//e.SetType(recv.StreamName)
-	//e.SetSubject(recv.StreamName)
-	//e.SetSource(recv.StreamId)
-	//_ = e.SetData(cloudevents.ApplicationJSON, recv.Data)
+	e.SetSubject(recv.StreamName)
 
 	logrus.Debugf("准备发送%d 数据 %+v 至 url: %s", recv.Offset, e.String(), r.sink.Uri)
 	res := c.Send(ctx, e)
@@ -187,9 +189,9 @@ func (r *SubscriberRunner) sendCloudEvent(recv *protocol.ReadResponse) error {
 	if cloudevents.ResultAs(res, &httpResult) {
 		logrus.Debugf("Sent data with status code %d", httpResult.StatusCode)
 	} else {
-		logrus.Errorf("Send data response not http response")
+		logrus.Errorf("Send data response not http response,result:%+v", res)
 	}
-	logrus.Debugf("发送数据完成")
+	logrus.Debugf("send cloudevent finish")
 	return nil
 }
 
@@ -201,5 +203,5 @@ func getSubscriberName(name string, hostname string, getName string) []byte {
 
 //TODO:sink 等参数指定
 func NewSubscribeRunner(sb *proto.Subscribe, conn *grpc.ClientConn) *SubscriberRunner {
-	return &SubscriberRunner{conn: conn, subscribe: sb}
+	return &SubscriberRunner{conn: conn, subscribe: sb, sink: SubscribeSink{Uri: sb.Uri}}
 }
