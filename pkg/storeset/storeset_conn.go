@@ -109,7 +109,7 @@ func (c *StoreSetConn) startExistRunner(ctx context.Context) {
 		logrus.Debugf(`start exist subscribe %s for connection %s`, s, c.name)
 		if !ok {
 			logrus.Debugf(`subscribe %s not exist for connection %s, create and start`, s, c.name)
-			runner = NewSubscribeRunner(subscribe, c.conn)
+			runner = NewSubscribeRunner(subscribe, c.conn, nil)
 			c.runners[subscribe.Name] = runner
 			go runner.Start(ctx)
 		}

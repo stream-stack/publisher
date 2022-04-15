@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/codes"
 	_ "google.golang.org/grpc/health"
 	"google.golang.org/grpc/status"
+	"k8s.io/client-go/dynamic"
 	"os"
 	"time"
 )
@@ -34,6 +35,8 @@ type SubscriberRunner struct {
 
 	sink      SubscribeSink
 	subscribe *proto.Subscribe
+
+	client dynamic.Interface
 }
 
 func (r *SubscriberRunner) Stop() {
@@ -47,7 +50,6 @@ func (r *SubscriberRunner) Start(ctx context.Context) {
 	kvServiceClient := protocol.NewKVServiceClient(r.conn)
 
 	hostname, _ := os.Hostname()
-	streamName := os.Getenv("STREAM_NAME")
 	r.subscribeName = getSubscriberName(streamName, hostname, r.subscribe.GetName())
 
 	logrus.Infof("启动对store的分片stream订阅,hostname:%s,streamName:%s", hostname, streamName)
@@ -60,6 +62,7 @@ func (r *SubscriberRunner) Start(ctx context.Context) {
 		case <-r.ctx.Done():
 			return
 		default:
+			//TODO:使用client 更新crd
 			logrus.Debugf(`begin load subscribe offset key %s`, string(r.subscribeName))
 			get, err := kvServiceClient.Get(ctx, &protocol.GetRequest{Key: r.subscribeName})
 			if err != nil {
@@ -202,6 +205,6 @@ func getSubscriberName(name string, hostname string, getName string) []byte {
 }
 
 //TODO:sink 等参数指定
-func NewSubscribeRunner(sb *proto.Subscribe, conn *grpc.ClientConn) *SubscriberRunner {
-	return &SubscriberRunner{conn: conn, subscribe: sb, sink: SubscribeSink{Uri: sb.Uri}}
+func NewSubscribeRunner(sb *proto.Subscribe, conn *grpc.ClientConn, client dynamic.Interface) *SubscriberRunner {
+	return &SubscriberRunner{conn: conn, subscribe: sb, sink: SubscribeSink{Uri: sb.Uri}, client: client}
 }

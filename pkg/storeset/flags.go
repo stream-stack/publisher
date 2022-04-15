@@ -13,6 +13,9 @@ var connectionRetryDuration time.Duration
 var senderMaxRequestDuration time.Duration
 var senderMaxRequestRetryCount int
 
+var selector string
+var streamName string
+
 func InitFlags() {
 	config.RegisterFlags(func(command *cobra.Command) {
 		command.PersistentFlags().DurationVar(&ackDuration, "AckDuration", time.Second*5, "ack duration")
@@ -21,5 +24,8 @@ func InitFlags() {
 
 		command.PersistentFlags().DurationVar(&senderMaxRequestDuration, "sender-MaxRequestDuration", time.Second*10, "MaxRequestDuration")
 		command.PersistentFlags().IntVar(&senderMaxRequestRetryCount, "sender-MaxRequestRetryCount", 10, "MaxRequestRetryCount")
+
+		command.PersistentFlags().StringVar(&selector, "SELECTOR", "", "storeset selector")
+		command.PersistentFlags().StringVar(&streamName, "STREAM_NAME", "", "stream name")
 	})
 }

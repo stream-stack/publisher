@@ -29,7 +29,7 @@ func NewCommand() (*cobra.Command, context.Context, context.CancelFunc) {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logrus.SetLevel(logrus.TraceLevel)
 			storeset.StartStoreSetManager(ctx)
-			if err := storeset.StartXdsServer(ctx); err != nil {
+			if err := storeset.StartListWatcher(ctx); err != nil {
 				return err
 			}
 			<-ctx.Done()
@@ -37,7 +37,6 @@ func NewCommand() (*cobra.Command, context.Context, context.CancelFunc) {
 		},
 	}
 	storeset.InitFlags()
-	config.InitFlags()
 
 	viper.AutomaticEnv()
 	viper.AddConfigPath(`.`)
