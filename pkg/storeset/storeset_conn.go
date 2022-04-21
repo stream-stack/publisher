@@ -6,7 +6,7 @@ import (
 	_ "github.com/Jille/grpc-multi-resolver"
 	grpc_retry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/sirupsen/logrus"
-	"github.com/stream-stack/publisher/pkg/proto"
+	"github.com/stream-stack/common/protocol/operator"
 	"google.golang.org/grpc"
 	_ "google.golang.org/grpc/health"
 	"strings"
@@ -45,7 +45,7 @@ func (c *StoreSetConn) connect() error {
 	return nil
 }
 
-func getOrCreateConn(ctx context.Context, conns map[string]*StoreSetConn, store *proto.StoreSet) *StoreSetConn {
+func getOrCreateConn(ctx context.Context, conns map[string]*StoreSetConn, store *operator.StoreSet) *StoreSetConn {
 	name := formatStoreName(store)
 	conn, ok := conns[name]
 	if ok {
@@ -62,7 +62,7 @@ func getOrCreateConn(ctx context.Context, conns map[string]*StoreSetConn, store 
 	return conn
 }
 
-func formatStoreName(store *proto.StoreSet) string {
+func formatStoreName(store *operator.StoreSet) string {
 	return fmt.Sprintf("%s/%s", store.Namespace, store.Name)
 }
 

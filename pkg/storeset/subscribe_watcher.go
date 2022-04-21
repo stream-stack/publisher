@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/sirupsen/logrus"
-	v12 "github.com/stream-stack/publisher/pkg/crd/knative/v1"
-	"github.com/stream-stack/publisher/pkg/proto"
+	v1 "github.com/stream-stack/common/crd/knative/v1"
+	"github.com/stream-stack/common/protocol/operator"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -95,19 +95,19 @@ func (s *subscribeResourceEventHandler) OnDelete(obj interface{}) {
 	}
 }
 
-func convertSubscribe(obj interface{}) (*proto.Subscribe, error) {
+func convertSubscribe(obj interface{}) (*operator.Subscribe, error) {
 	u, ok := obj.(*unstructured.Unstructured)
 	if !ok {
 		return nil, fmt.Errorf("cast type %T conversion to unstructured.Unstructured failed", obj)
 	}
-	set := &v12.Subscription{}
+	set := &v1.Subscription{}
 	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), set)
 	if err != nil {
 		logrus.Errorf("convertStoreset Unstructured to Subscription error:%v", err)
 		return nil, err
 	}
 
-	return &proto.Subscribe{
+	return &operator.Subscribe{
 		Name: set.Name,
 		//TODO:生成uri
 		Uri: "http://www.baidu.com",

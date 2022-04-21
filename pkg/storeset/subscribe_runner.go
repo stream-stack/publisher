@@ -7,8 +7,8 @@ import (
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	cehttp "github.com/cloudevents/sdk-go/v2/protocol/http"
 	"github.com/sirupsen/logrus"
-	"github.com/stream-stack/publisher/pkg/proto"
-	"github.com/stream-stack/store/pkg/protocol"
+	"github.com/stream-stack/common/protocol/operator"
+	"github.com/stream-stack/common/protocol/store"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	_ "google.golang.org/grpc/health"
@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-var subscribes = make(map[string]*proto.Subscribe)
+var subscribes = make(map[string]*operator.Subscribe)
 
 type SubscribeSink struct {
 	Uri string
@@ -34,7 +34,7 @@ type SubscriberRunner struct {
 	ackCh         chan uint64
 
 	sink      SubscribeSink
-	subscribe *proto.Subscribe
+	subscribe *operator.Subscribe
 
 	client dynamic.Interface
 }
@@ -46,8 +46,8 @@ func (r *SubscriberRunner) Stop() {
 func (r *SubscriberRunner) Start(ctx context.Context) {
 	r.ctx, r.cancelFunc = context.WithCancel(ctx)
 
-	eventServiceClient := protocol.NewEventServiceClient(r.conn)
-	kvServiceClient := protocol.NewKVServiceClient(r.conn)
+	eventServiceClient := store.NewEventServiceClient(r.conn)
+	kvServiceClient := store.NewKVServiceClient(r.conn)
 
 	hostname, _ := os.Hostname()
 	r.subscribeName = getSubscriberName(streamName, hostname, r.subscribe.GetName())
@@ -64,7 +64,7 @@ func (r *SubscriberRunner) Start(ctx context.Context) {
 		default:
 			//TODO:使用client 更新crd
 			logrus.Debugf(`begin load subscribe offset key %s`, string(r.subscribeName))
-			get, err := kvServiceClient.Get(ctx, &protocol.GetRequest{Key: r.subscribeName})
+			get, err := kvServiceClient.Get(ctx, &store.GetRequest{Key: r.subscribeName})
 			if err != nil {
 				logrus.Debugf(`load subscribe offset key %s, error:%v`, string(r.subscribeName), err)
 				convert := status.Convert(err)
@@ -76,12 +76,12 @@ func (r *SubscriberRunner) Start(ctx context.Context) {
 					continue
 				}
 			} else {
-				offset = protocol.BytesToUint64(get.Data) + 1
+				offset = store.BytesToUint64(get.Data) + 1
 				logrus.Debugf(`load subscribe offset key %s, value %d`, string(r.subscribeName), offset)
 			}
 
 			logrus.Debugf(`begin eventServiceClient subscribe`)
-			subscribe, err := eventServiceClient.Subscribe(r.ctx, &protocol.SubscribeRequest{
+			subscribe, err := eventServiceClient.Subscribe(r.ctx, &store.SubscribeRequest{
 				SubscribeId: hostname,
 				Regexp:      "streamName == '" + streamName + "'",
 				Offset:      offset,
@@ -97,7 +97,7 @@ func (r *SubscriberRunner) Start(ctx context.Context) {
 
 }
 
-func (r *SubscriberRunner) doRecv(subscribe protocol.EventService_SubscribeClient) {
+func (r *SubscriberRunner) doRecv(subscribe store.EventService_SubscribeClient) {
 	logrus.Debugf(`begin recv`)
 	for {
 		select {
@@ -121,7 +121,7 @@ func (r *SubscriberRunner) doRecv(subscribe protocol.EventService_SubscribeClien
 	}
 }
 
-func (r *SubscriberRunner) startAck(cli protocol.KVServiceClient) {
+func (r *SubscriberRunner) startAck(cli store.KVServiceClient) {
 	logrus.Debugf(`start subscribe ack`)
 	r.ackCh = make(chan uint64, 1)
 	ticker := time.NewTicker(ackDuration)
@@ -146,9 +146,9 @@ func (r *SubscriberRunner) startAck(cli protocol.KVServiceClient) {
 		if offset <= 0 || offset == prev {
 			continue
 		}
-		put, err := cli.Put(r.ctx, &protocol.PutRequest{
+		put, err := cli.Put(r.ctx, &store.PutRequest{
 			Key: r.subscribeName,
-			Val: protocol.Uint64ToBytes(offset),
+			Val: store.Uint64ToBytes(offset),
 		})
 		if err != nil {
 			logrus.Errorf("ack subscribe[%s] offset to [%d] error:%v,result:%+v", r.subscribeName, offset, err, put)
@@ -159,7 +159,7 @@ func (r *SubscriberRunner) startAck(cli protocol.KVServiceClient) {
 	}
 }
 
-func (r *SubscriberRunner) sendCloudEvent(recv *protocol.ReadResponse) error {
+func (r *SubscriberRunner) sendCloudEvent(recv *store.ReadResponse) error {
 	ctx := cloudevents.ContextWithTarget(r.ctx, r.sink.Uri)
 	ctx = cloudevents.ContextWithRetriesExponentialBackoff(ctx, senderMaxRequestDuration, senderMaxRequestRetryCount)
 
@@ -205,6 +205,6 @@ func getSubscriberName(name string, hostname string, getName string) []byte {
 }
 
 //TODO:sink 等参数指定
-func NewSubscribeRunner(sb *proto.Subscribe, conn *grpc.ClientConn, client dynamic.Interface) *SubscriberRunner {
+func NewSubscribeRunner(sb *operator.Subscribe, conn *grpc.ClientConn, client dynamic.Interface) *SubscriberRunner {
 	return &SubscriberRunner{conn: conn, subscribe: sb, sink: SubscribeSink{Uri: sb.Uri}, client: client}
 }

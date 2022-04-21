@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/sirupsen/logrus"
-	v1 "github.com/stream-stack/publisher/pkg/crd/storeset/v1"
-	"github.com/stream-stack/publisher/pkg/proto"
+	v12 "github.com/stream-stack/common/crd/storeset/v1"
+	"github.com/stream-stack/common/protocol/operator"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -84,18 +84,18 @@ func (s *storesetResourceEventHandler) OnDelete(obj interface{}) {
 	}
 }
 
-func convert(obj interface{}) (*proto.StoreSet, error) {
+func convert(obj interface{}) (*operator.StoreSet, error) {
 	u, ok := obj.(*unstructured.Unstructured)
 	if !ok {
 		return nil, fmt.Errorf("cast type %T conversion to unstructured.Unstructured failed", obj)
 	}
-	set := &v1.StoreSet{}
+	set := &v12.StoreSet{}
 	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), set)
 	if err != nil {
 		logrus.Errorf("convertStoreset Unstructured to storeset error:%v", err)
 		return nil, err
 	}
-	if set.Status.Status != v1.StoreSetStatusReady {
+	if set.Status.Status != v12.StoreSetStatusReady {
 		logrus.Debugf("storeset %s/%s status %s not ready,ignore", set.Namespace, set.Name, set.Status.Status)
 		return nil, nil
 	}
@@ -103,8 +103,8 @@ func convert(obj interface{}) (*proto.StoreSet, error) {
 	return store, nil
 }
 
-func NewStoreset(set *v1.StoreSet) *proto.StoreSet {
-	s := &proto.StoreSet{
+func NewStoreset(set *v12.StoreSet) *operator.StoreSet {
+	s := &operator.StoreSet{
 		Name:      set.Name,
 		Namespace: set.Namespace,
 		Uris:      buildStoreUri(set),
@@ -112,7 +112,7 @@ func NewStoreset(set *v1.StoreSet) *proto.StoreSet {
 	return s
 }
 
-func buildStoreUri(item *v1.StoreSet) []string {
+func buildStoreUri(item *v12.StoreSet) []string {
 	replicas := *item.Spec.Store.Replicas
 	addrs := make([]string, replicas)
 	var i int32
