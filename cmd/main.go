@@ -32,6 +32,9 @@ func NewCommand() (*cobra.Command, context.Context, context.CancelFunc) {
 			if err := storeset.StartListWatcher(ctx); err != nil {
 				return err
 			}
+			if err := storeset.StartHttpServer(ctx, cancelFunc); err != nil {
+				return err
+			}
 			<-ctx.Done()
 			return nil
 		},
