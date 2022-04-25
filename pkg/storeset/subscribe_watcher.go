@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/sirupsen/logrus"
 	v1 "github.com/stream-stack/common/crd/knative/v1"
-	"github.com/stream-stack/common/protocol/operator"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -19,6 +18,8 @@ import (
 func init() {
 	watchers = append(watchers, watchSubscribe)
 }
+
+var subscribes = make(map[string]v1.Subscription)
 
 func watchSubscribe(ctx context.Context, client dynamic.Interface) error {
 	namespace := os.Getenv("NAMESPACE")
@@ -42,23 +43,29 @@ type subscribeResourceEventHandler struct {
 }
 
 func (s *subscribeResourceEventHandler) OnAdd(obj interface{}) {
-	subscribe, err := convertSubscribe(obj)
+	sbs, err := convertSubscribe(obj)
 	if err != nil {
-		logrus.Errorf("convertSubscribe k8s subscribe(crd) to subscribe error:%v", err)
+		logrus.Errorf("convertSubscribe k8s subscribe(crd) to subscribes error:%v", err)
 		return
 	}
-	if subscribe == nil {
+	if sbs == nil {
+		logrus.Debugf("convertSubscribe k8s subscribe(crd) to subscribes is nil")
 		return
 	}
-	logrus.Debugf("received subscribe %s add", subscribe.Name)
+	if sbs.Spec.Broker != broker {
+		logrus.Debugf("OnAdd, subscription(crd).spec.broker %s is not for this broker(%s), skip", sbs.Spec.Broker, broker)
+		return
+	}
+	logrus.Debugf("received subscribes %v add", sbs.Name)
 	StoreSetOpCh <- func(ctx context.Context, conns map[string]*StoreSetConn) {
-		subscribes[subscribe.Name] = subscribe
+		subscription := *sbs
+		subscribes[sbs.Name] = subscription
 		for _, conn := range conns {
-			conn.RunnerOpCh <- func(ctx context.Context, runners map[string]*SubscriberRunner) {
-				runner, ok := runners[subscribe.Name]
+			conn.RunnerOpCh <- func(ctx context.Context, runners map[string]*v1.SubscriberRunner) {
+				runner, ok := runners[sbs.Name]
 				if !ok {
-					runner = NewSubscribeRunner(subscribe, conn.conn, s.client)
-					runners[subscribe.Name] = runner
+					subscribeRunner := v1.NewSubscribeRunner(subscription, subscription.Spec.Subscriber, conn.conn, s.client, streamName)
+					runners[sbs.Name] = subscribeRunner
 					go runner.Start(ctx)
 				}
 				//TODO:订阅更新地址等信息
@@ -73,20 +80,26 @@ func (s *subscribeResourceEventHandler) OnUpdate(oldObj, newObj interface{}) {
 }
 
 func (s *subscribeResourceEventHandler) OnDelete(obj interface{}) {
-	subscribe, err := convertSubscribe(obj)
+	sbs, err := convertSubscribe(obj)
 	if err != nil {
-		logrus.Errorf("convertSubscribe k8s subscribe(crd) to subscribe error:%v", err)
+		logrus.Errorf("convertSubscribe k8s subscribe(crd) to subscribes error:%v", err)
 		return
 	}
-	if subscribe == nil {
+	if sbs == nil {
+		logrus.Debugf("convertSubscribe k8s subscribe(crd) to subscribes is nil")
 		return
 	}
-	logrus.Debugf("received subscribe %s delete", subscribe.Name)
+	if sbs.Spec.Broker != broker {
+		logrus.Debugf("OnDelete, subscription(crd).spec.broker %s is not for this broker(%s), skip", sbs.Spec.Broker, broker)
+		return
+	}
+	logrus.Debugf("received subscribe %v delete", sbs.Name)
 	StoreSetOpCh <- func(ctx context.Context, conns map[string]*StoreSetConn) {
-		subscribes[subscribe.Name] = subscribe
+		subscription := *sbs
+		subscribes[sbs.Name] = subscription
 		for _, conn := range conns {
-			conn.RunnerOpCh <- func(ctx context.Context, runners map[string]*SubscriberRunner) {
-				runner, ok := runners[subscribe.Name]
+			conn.RunnerOpCh <- func(ctx context.Context, runners map[string]*v1.SubscriberRunner) {
+				runner, ok := runners[subscription.Name]
 				if ok {
 					runner.Stop()
 				}
@@ -95,7 +108,7 @@ func (s *subscribeResourceEventHandler) OnDelete(obj interface{}) {
 	}
 }
 
-func convertSubscribe(obj interface{}) (*operator.Subscribe, error) {
+func convertSubscribe(obj interface{}) (*v1.Subscription, error) {
 	u, ok := obj.(*unstructured.Unstructured)
 	if !ok {
 		return nil, fmt.Errorf("cast type %T conversion to unstructured.Unstructured failed", obj)
@@ -106,10 +119,5 @@ func convertSubscribe(obj interface{}) (*operator.Subscribe, error) {
 		logrus.Errorf("convertStoreset Unstructured to Subscription error:%v", err)
 		return nil, err
 	}
-
-	return &operator.Subscribe{
-		Name: set.Name,
-		//TODO:生成uri
-		Uri: "http://www.baidu.com",
-	}, nil
+	return set, nil
 }

@@ -6,9 +6,11 @@ import (
 	_ "github.com/Jille/grpc-multi-resolver"
 	grpc_retry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/sirupsen/logrus"
+	v1 "github.com/stream-stack/common/crd/knative/v1"
 	"github.com/stream-stack/common/protocol/operator"
 	"google.golang.org/grpc"
 	_ "google.golang.org/grpc/health"
+	"k8s.io/client-go/dynamic"
 	"strings"
 	"time"
 )
@@ -18,11 +20,12 @@ type StoreSetConn struct {
 	name string
 	uris []string
 
-	runners    map[string]*SubscriberRunner
-	RunnerOpCh chan func(ctx context.Context, runners map[string]*SubscriberRunner)
+	runners    map[string]*v1.SubscriberRunner
+	RunnerOpCh chan func(ctx context.Context, runners map[string]*v1.SubscriberRunner)
 
 	ctx        context.Context
 	cancelFunc context.CancelFunc
+	client     dynamic.Interface
 }
 
 func (c *StoreSetConn) connect() error {
@@ -45,7 +48,7 @@ func (c *StoreSetConn) connect() error {
 	return nil
 }
 
-func getOrCreateConn(ctx context.Context, conns map[string]*StoreSetConn, store *operator.StoreSet) *StoreSetConn {
+func getOrCreateConn(ctx context.Context, conns map[string]*StoreSetConn, store *operator.StoreSet, client dynamic.Interface) *StoreSetConn {
 	name := formatStoreName(store)
 	conn, ok := conns[name]
 	if ok {
@@ -55,7 +58,8 @@ func getOrCreateConn(ctx context.Context, conns map[string]*StoreSetConn, store 
 	conn = &StoreSetConn{
 		name:    name,
 		uris:    store.Uris,
-		runners: make(map[string]*SubscriberRunner),
+		runners: make(map[string]*v1.SubscriberRunner),
+		client:  client,
 	}
 	go conn.Start(ctx)
 	storesetConns[name] = conn
@@ -74,7 +78,7 @@ func (c *StoreSetConn) Stop() {
 func (c *StoreSetConn) Start(ctx context.Context) {
 	logrus.Debugf(`start storeset connection %s,uris: %v`, c.name, c.uris)
 	c.ctx, c.cancelFunc = context.WithCancel(ctx)
-	c.RunnerOpCh = make(chan func(ctx context.Context, runners map[string]*SubscriberRunner), 1)
+	c.RunnerOpCh = make(chan func(ctx context.Context, runners map[string]*v1.SubscriberRunner), 1)
 	for {
 		select {
 		case <-c.ctx.Done():
@@ -109,7 +113,7 @@ func (c *StoreSetConn) startExistRunner(ctx context.Context) {
 		logrus.Debugf(`start exist subscribe %s for connection %s`, s, c.name)
 		if !ok {
 			logrus.Debugf(`subscribe %s not exist for connection %s, create and start`, s, c.name)
-			runner = NewSubscribeRunner(subscribe, c.conn, nil)
+			runner = v1.NewSubscribeRunner(subscribe, subscribe.Spec.Subscriber, c.conn, c.client, streamName)
 			c.runners[subscribe.Name] = runner
 			go runner.Start(ctx)
 		}

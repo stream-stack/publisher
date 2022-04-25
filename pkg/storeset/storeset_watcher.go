@@ -35,7 +35,7 @@ func watchStoreset(ctx context.Context, client dynamic.Interface) error {
 		options.LabelSelector = listOps.LabelSelector
 	})
 	resource := informerFactory.ForResource(gvr)
-	handler := &storesetResourceEventHandler{ctx: ctx}
+	handler := &storesetResourceEventHandler{ctx: ctx, client: client}
 	resource.Informer().AddEventHandler(handler)
 
 	logrus.Debugf("start informer at namespace [%s] for %s/%s/%s", "", gvr.Group, gvr.Version, gvr.Resource)
@@ -45,7 +45,8 @@ func watchStoreset(ctx context.Context, client dynamic.Interface) error {
 }
 
 type storesetResourceEventHandler struct {
-	ctx context.Context
+	ctx    context.Context
+	client dynamic.Interface
 }
 
 func (s *storesetResourceEventHandler) OnAdd(obj interface{}) {
@@ -59,7 +60,7 @@ func (s *storesetResourceEventHandler) OnAdd(obj interface{}) {
 	}
 	logrus.Debugf("received storeset %s/%s add", store.Namespace, store.Name)
 	StoreSetOpCh <- func(ctx context.Context, m map[string]*StoreSetConn) {
-		getOrCreateConn(ctx, m, store)
+		getOrCreateConn(ctx, m, store, s.client)
 	}
 }
 
@@ -79,7 +80,7 @@ func (s *storesetResourceEventHandler) OnDelete(obj interface{}) {
 	}
 	logrus.Debugf("received storeset %s/%s delete", store.Namespace, store.Name)
 	StoreSetOpCh <- func(ctx context.Context, m map[string]*StoreSetConn) {
-		conn := getOrCreateConn(ctx, m, store)
+		conn := getOrCreateConn(ctx, m, store, nil)
 		conn.Stop()
 	}
 }
