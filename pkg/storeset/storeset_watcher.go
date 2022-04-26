@@ -80,7 +80,7 @@ func (s *storesetResourceEventHandler) OnDelete(obj interface{}) {
 	}
 	logrus.Debugf("received storeset %s/%s delete", store.Namespace, store.Name)
 	StoreSetOpCh <- func(ctx context.Context, m map[string]*StoreSetConn) {
-		conn := getOrCreateConn(ctx, m, store, nil)
+		conn := getOrCreateConn(ctx, m, store, s.client)
 		conn.Stop()
 	}
 }

@@ -6,7 +6,6 @@ import (
 	_ "github.com/Jille/grpc-multi-resolver"
 	grpc_retry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"github.com/sirupsen/logrus"
-	v1 "github.com/stream-stack/common/crd/knative/v1"
 	"github.com/stream-stack/common/protocol/operator"
 	"google.golang.org/grpc"
 	_ "google.golang.org/grpc/health"
@@ -20,8 +19,8 @@ type StoreSetConn struct {
 	name string
 	uris []string
 
-	runners    map[string]*v1.SubscriberRunner
-	RunnerOpCh chan func(ctx context.Context, runners map[string]*v1.SubscriberRunner)
+	runners    map[string]*SubscriberRunner
+	RunnerOpCh chan func(ctx context.Context, runners map[string]*SubscriberRunner)
 
 	ctx        context.Context
 	cancelFunc context.CancelFunc
@@ -58,7 +57,7 @@ func getOrCreateConn(ctx context.Context, conns map[string]*StoreSetConn, store 
 	conn = &StoreSetConn{
 		name:    name,
 		uris:    store.Uris,
-		runners: make(map[string]*v1.SubscriberRunner),
+		runners: make(map[string]*SubscriberRunner),
 		client:  client,
 	}
 	go conn.Start(ctx)
@@ -78,7 +77,7 @@ func (c *StoreSetConn) Stop() {
 func (c *StoreSetConn) Start(ctx context.Context) {
 	logrus.Debugf(`start storeset connection %s,uris: %v`, c.name, c.uris)
 	c.ctx, c.cancelFunc = context.WithCancel(ctx)
-	c.RunnerOpCh = make(chan func(ctx context.Context, runners map[string]*v1.SubscriberRunner), 1)
+	c.RunnerOpCh = make(chan func(ctx context.Context, runners map[string]*SubscriberRunner), 1)
 	for {
 		select {
 		case <-c.ctx.Done():
@@ -113,7 +112,7 @@ func (c *StoreSetConn) startExistRunner(ctx context.Context) {
 		logrus.Debugf(`start exist subscribe %s for connection %s`, s, c.name)
 		if !ok {
 			logrus.Debugf(`subscribe %s not exist for connection %s, create and start`, s, c.name)
-			runner = v1.NewSubscribeRunner(subscribe, subscribe.Spec.Subscriber, c.conn, c.client, streamName)
+			runner = NewSubscribeRunner(subscribe, subscribe.Spec.Subscriber, c.conn, c.client, streamName)
 			c.runners[subscribe.Name] = runner
 			go runner.Start(ctx)
 		}

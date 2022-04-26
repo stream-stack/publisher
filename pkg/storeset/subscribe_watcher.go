@@ -61,11 +61,11 @@ func (s *subscribeResourceEventHandler) OnAdd(obj interface{}) {
 		subscription := *sbs
 		subscribes[sbs.Name] = subscription
 		for _, conn := range conns {
-			conn.RunnerOpCh <- func(ctx context.Context, runners map[string]*v1.SubscriberRunner) {
+			conn.RunnerOpCh <- func(ctx context.Context, runners map[string]*SubscriberRunner) {
 				runner, ok := runners[sbs.Name]
 				if !ok {
-					subscribeRunner := v1.NewSubscribeRunner(subscription, subscription.Spec.Subscriber, conn.conn, s.client, streamName)
-					runners[sbs.Name] = subscribeRunner
+					runner = NewSubscribeRunner(subscription, subscription.Spec.Subscriber, conn.conn, s.client, streamName)
+					runners[sbs.Name] = runner
 					go runner.Start(ctx)
 				}
 				//TODO:订阅更新地址等信息
@@ -98,11 +98,13 @@ func (s *subscribeResourceEventHandler) OnDelete(obj interface{}) {
 		subscription := *sbs
 		subscribes[sbs.Name] = subscription
 		for _, conn := range conns {
-			conn.RunnerOpCh <- func(ctx context.Context, runners map[string]*v1.SubscriberRunner) {
+			conn.RunnerOpCh <- func(ctx context.Context, runners map[string]*SubscriberRunner) {
 				runner, ok := runners[subscription.Name]
 				if ok {
 					runner.Stop()
 				}
+				delete(subscribes, subscription.Name)
+				delete(runners, subscription.Name)
 			}
 		}
 	}
