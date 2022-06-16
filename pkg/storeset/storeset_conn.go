@@ -55,10 +55,11 @@ func getOrCreateConn(ctx context.Context, conns map[string]*StoreSetConn, store 
 		return conn
 	}
 	conn = &StoreSetConn{
-		name:    name,
-		uris:    store.Uris,
-		runners: make(map[string]*SubscriberRunner),
-		client:  client,
+		name:       name,
+		uris:       store.Uris,
+		runners:    make(map[string]*SubscriberRunner),
+		client:     client,
+		RunnerOpCh: make(chan func(ctx context.Context, runners map[string]*SubscriberRunner), 1),
 	}
 	go conn.Start(ctx)
 	storesetConns[name] = conn
@@ -77,7 +78,6 @@ func (c *StoreSetConn) Stop() {
 func (c *StoreSetConn) Start(ctx context.Context) {
 	logrus.Debugf(`start storeset connection %s,uris: %v`, c.name, c.uris)
 	c.ctx, c.cancelFunc = context.WithCancel(ctx)
-	c.RunnerOpCh = make(chan func(ctx context.Context, runners map[string]*SubscriberRunner), 1)
 	for {
 		select {
 		case <-c.ctx.Done():

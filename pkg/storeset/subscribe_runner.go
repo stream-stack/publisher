@@ -15,7 +15,6 @@ import (
 	"google.golang.org/grpc/status"
 	"k8s.io/client-go/dynamic"
 	"os"
-	"time"
 )
 
 type SubscriberRunner struct {
@@ -25,12 +24,19 @@ type SubscriberRunner struct {
 	conn *grpc.ClientConn
 
 	subscribeName []byte
-	ackCh         chan uint64
 
 	client     dynamic.Interface
 	spec       v1.Subscription
 	s          v1.Subscriber
 	streamName string
+
+	actors    map[string]*actor
+	actorFunc chan func(actors map[string]*actor)
+
+	ack *SubscriberRunnerAck
+
+	eventServiceClient store.EventServiceClient
+	kvServiceClient    store.KVServiceClient
 }
 
 func (r *SubscriberRunner) Stop() {
@@ -40,16 +46,15 @@ func (r *SubscriberRunner) Stop() {
 func (r *SubscriberRunner) Start(ctx context.Context) {
 	r.ctx, r.cancelFunc = context.WithCancel(ctx)
 
-	eventServiceClient := store.NewEventServiceClient(r.conn)
-	kvServiceClient := store.NewKVServiceClient(r.conn)
-
 	hostname, _ := os.Hostname()
 	r.subscribeName = getSubscriberName(r.streamName, hostname, r.s)
 
 	logrus.Infof("启动对store的分片stream订阅,hostname:%s,streamName:%s", hostname, r.streamName)
 
+	r.ack = NewSubscriberRunnerAck(r.kvServiceClient, r.spec.Spec.Delivery.AckDuration.Duration, r.subscribeName)
+	go r.ack.Start(r.ctx)
+	go r.startActorManager()
 	var offset uint64
-	go r.startAck(kvServiceClient)
 
 	for {
 		select {
@@ -58,7 +63,7 @@ func (r *SubscriberRunner) Start(ctx context.Context) {
 		default:
 			//TODO:使用client 更新crd
 			logrus.Debugf(`begin load subscribe offset key %s`, string(r.subscribeName))
-			get, err := kvServiceClient.Get(ctx, &store.GetRequest{Key: r.subscribeName})
+			get, err := r.kvServiceClient.Get(ctx, &store.GetRequest{Key: r.subscribeName})
 			if err != nil {
 				logrus.Debugf(`load subscribe offset key %s, error:%v`, string(r.subscribeName), err)
 				convert := status.Convert(err)
@@ -75,7 +80,7 @@ func (r *SubscriberRunner) Start(ctx context.Context) {
 			}
 
 			logrus.Debugf(`begin eventServiceClient subscribe`)
-			subscribe, err := eventServiceClient.Subscribe(r.ctx, &store.SubscribeRequest{
+			subscribe, err := r.eventServiceClient.Subscribe(r.ctx, &store.SubscribeRequest{
 				SubscribeId: hostname,
 				Regexp:      "streamName == '" + r.streamName + "'",
 				Offset:      offset,
@@ -106,94 +111,61 @@ func (r *SubscriberRunner) doRecv(subscribe store.EventService_SubscribeClient) 
 
 			logrus.Debugf("收到消息,%+v", recv)
 
-			if err = r.SendCloudEvent(recv); err != nil {
-				logrus.Errorf(`发送 cloudevent出现错误`)
+			flag := r.ack.addOffsetFlag(recv.Offset)
+			key := fmt.Sprintf(`%s-%s`, recv.StreamName, recv.StreamId)
+			f := func(ctx context.Context, client cloudevents.Client, target string) {
+				e := cloudevents.NewEvent()
+				err = e.UnmarshalJSON(recv.Data)
+				if err != nil {
+					logrus.Errorf(`unmarshal cloudevent error:%v`, err)
+				}
+				e.SetSubject(broker)
+
+				logrus.Debugf("准备发送%d 数据 %+v 至 url: %s", recv.Offset, e.String(), target)
+
+				res := client.Send(ctx, e)
+				if cloudevents.IsUndelivered(res) {
+					logrus.Debugf("Failed to send: %v", res)
+					return
+				}
+				var httpResult *cehttp.Result
+				if cloudevents.ResultAs(res, &httpResult) {
+					logrus.Debugf("Sent data with status code %d", httpResult.StatusCode)
+				} else {
+					logrus.Errorf("Send data response not http response,result:%+v", res)
+				}
+				logrus.Debugf("send cloudevent finish")
+				//TODO:发送失败,转到死信队列(如何判断投递成功?)
+
+				flag.Flag = true
+				r.ack.in <- recv.Offset
 			}
 
-			r.ackCh <- recv.Offset
+			r.actorFunc <- func(actors map[string]*actor) {
+				a, ok := actors[key]
+				if !ok {
+					a = newActor(r, key)
+					actors[key] = a
+					go a.Start(r.ctx)
+				}
+				a.in <- f
+			}
 		}
 	}
 }
 
-func (r *SubscriberRunner) SendCloudEvent(recv *store.ReadResponse) error {
-	target := r.s.GetTarget()
-	ctx := cloudevents.ContextWithTarget(r.ctx, target)
-	runner := *r
-	delivery := *runner.spec.Spec.Delivery
-	retries := delivery.MaxRetries
-	//retries := r.spec.Spec.Delivery.MaxRetries
-	ctx = cloudevents.ContextWithRetriesExponentialBackoff(ctx, r.spec.Spec.Delivery.MaxRequestDuration.Duration, *retries)
+func (r *SubscriberRunner) startActorManager() {
+	r.actors = make(map[string]*actor)
 
-	p, err := cloudevents.NewHTTP()
-	if err != nil {
-		logrus.Errorf("failed to create protocol: %s", err)
-		return err
-	}
-
-	c, err := cloudevents.NewClient(p, cloudevents.WithTimeNow(), cloudevents.WithUUIDs())
-	if err != nil {
-		logrus.Errorf("failed to create client, %v", err)
-		return err
-	}
-
-	e := cloudevents.NewEvent()
-	err = e.UnmarshalJSON(recv.Data)
-	if err != nil {
-		logrus.Errorf(`unmarshal cloudevent error:%v`, err)
-		return err
-	}
-	e.SetSubject(broker)
-
-	logrus.Debugf("准备发送%d 数据 %+v 至 url: %s", recv.Offset, e.String(), target)
-	res := c.Send(ctx, e)
-	if cloudevents.IsUndelivered(res) {
-		logrus.Debugf("Failed to send: %v", res)
-	}
-	var httpResult *cehttp.Result
-	if cloudevents.ResultAs(res, &httpResult) {
-		logrus.Debugf("Sent data with status code %d", httpResult.StatusCode)
-	} else {
-		logrus.Errorf("Send data response not http response,result:%+v", res)
-	}
-	logrus.Debugf("send cloudevent finish")
-	return nil
-}
-
-func (r *SubscriberRunner) startAck(cli store.KVServiceClient) {
-	logrus.Debugf(`start subscribe ack`)
-	r.ackCh = make(chan uint64, 1)
-	ticker := time.NewTicker(r.spec.Spec.Delivery.AckDuration.Duration)
-	defer ticker.Stop()
-
-	var prev uint64
-	var offset uint64
 	for {
 		select {
 		case <-r.ctx.Done():
-			close(r.ackCh)
 			return
-		case of := <-r.ackCh:
-			offset = of
-			if prev == 0 {
-				prev = of
-			}
-			continue
-		case <-ticker.C:
-
+		case f := <-r.actorFunc:
+			f(r.actors)
+			logrus.Debugf("当前actor数量:%d", len(r.actors))
+			logrus.Debugf("当前actor:%+v", r.actors)
 		}
-		if offset <= 0 || offset == prev {
-			continue
-		}
-		put, err := cli.Put(r.ctx, &store.PutRequest{
-			Key: r.subscribeName,
-			Val: store.Uint64ToBytes(offset),
-		})
-		if err != nil {
-			logrus.Errorf("ack subscribe[%s] offset to [%d] error:%v,result:%+v", r.subscribeName, offset, err, put)
-			continue
-		}
-		logrus.Debugf("ack subscribe[%s] offset to [%d]", r.subscribeName, offset)
-		prev = offset
 	}
 }
 
@@ -204,5 +176,13 @@ func getSubscriberName(name string, hostname string, s v1.Subscriber) []byte {
 }
 
 func NewSubscribeRunner(spec v1.Subscription, s v1.Subscriber, conn *grpc.ClientConn, client dynamic.Interface, streamName string) *SubscriberRunner {
-	return &SubscriberRunner{conn: conn, spec: spec, s: s, client: client, streamName: streamName}
+	return &SubscriberRunner{conn: conn,
+		spec:               spec,
+		s:                  s,
+		client:             client,
+		streamName:         streamName,
+		eventServiceClient: store.NewEventServiceClient(conn),
+		kvServiceClient:    store.NewKVServiceClient(conn),
+		actorFunc:          make(chan func(actors map[string]*actor)),
+	}
 }
