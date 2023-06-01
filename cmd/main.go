@@ -6,9 +6,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/stream-stack/publisher/pkg/config"
-	"github.com/stream-stack/publisher/pkg/storeset"
+	"github.com/stream-stack/publisher/pkg/store"
+	"math/rand"
 	"os"
 	"os/signal"
+	"strings"
+	"time"
 )
 
 func NewCommand() (*cobra.Command, context.Context, context.CancelFunc) {
@@ -28,22 +31,37 @@ func NewCommand() (*cobra.Command, context.Context, context.CancelFunc) {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logrus.SetLevel(logrus.TraceLevel)
-			storeset.StartStoreSetManager(ctx)
-			if err := storeset.StartListWatcher(ctx); err != nil {
+			rand.Seed(time.Now().UnixNano())
+			logrus.Debug("[config]env print:")
+			for _, s := range os.Environ() {
+				if strings.HasPrefix(s, "STREAM_DISPATCHER") {
+					logrus.Debug(s)
+				}
+			}
+
+			logrus.Debugf("[config]dump config:%v", viper.AllSettings())
+			if err := store.Start(ctx); err != nil {
 				return err
 			}
-			if err := storeset.StartHttpServer(ctx, cancelFunc); err != nil {
-				return err
-			}
+
 			<-ctx.Done()
 			return nil
 		},
 	}
-	storeset.InitFlags()
+	store.InitFlags()
 
-	viper.AutomaticEnv()
-	viper.AddConfigPath(`.`)
+	viper.AddConfigPath(`./config`)
+	viper.SetConfigName("config")
 	config.BuildFlags(command)
+	viper.SetEnvPrefix("stream_publisher")
+	viper.AutomaticEnv()
+
+	if err := viper.ReadInConfig(); err != nil {
+		logrus.Errorf("[config]read config error:%v", err)
+	}
+	if err := viper.BindPFlags(command.PersistentFlags()); err != nil {
+		logrus.Errorf("[config]BindPFlags config error:%v", err)
+	}
 
 	return command, ctx, cancelFunc
 }
