@@ -45,7 +45,7 @@ func (f *fakeClient) Put(ctx context.Context, in *v1.PutRequest, opts ...grpc.Ca
 func TestOffsetSyncer(t *testing.T) {
 	logrus.SetLevel(logrus.TraceLevel)
 	todo := context.TODO()
-	viper.SetDefault("offset-sync-interval", time.Second*1)
+	viper.SetDefault("OffsetSyncInterval", time.Second*1)
 	c := make(chan interface{})
 	kc := &fakeClient{c: c}
 	_, offsetCh, err := startOffsetSyncer(todo, kc, "")

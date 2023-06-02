@@ -15,7 +15,7 @@ import (
 )
 
 func Start(ctx context.Context) error {
-	partitionFile := viper.GetString("store-partition-config-file")
+	partitionFile := viper.GetString("StorePartitionConfigFile")
 	if partitionFile == "" {
 		return fmt.Errorf("[store-client]store-partition-config-file not found")
 	}
@@ -115,7 +115,7 @@ func startOffsetSyncer(ctx context.Context, kc v1.PrivateKeyValueServiceClient, 
 		offset = util.BytesToUint64(get.Value)
 	}
 	offsetCh := make(chan uint64, 3)
-	duration := viper.GetDuration("offset-sync-interval")
+	duration := viper.GetDuration("OffsetSyncInterval")
 	ticker := time.NewTicker(duration)
 	go func() {
 		defer ticker.Stop()

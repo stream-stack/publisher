@@ -114,8 +114,8 @@ var virtualActorLifetime = time.Second * 10
 var subscribeUrl string
 
 func StartConsensus(ctx context.Context) {
-	virtualActorLifetime = viper.GetDuration("virtual-actor-lifetime")
-	subscribeUrl = viper.GetString("subscribe-url")
+	virtualActorLifetime = viper.GetDuration("VirtualActorLifetime")
+	subscribeUrl = viper.GetString("SubscribeUrl")
 	go func() {
 		for {
 			select {
