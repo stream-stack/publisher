@@ -118,8 +118,8 @@ func startOffsetSyncer(ctx context.Context, kc v1.PrivateKeyValueServiceClient, 
 	duration := viper.GetDuration("OffsetSyncInterval")
 	ticker := time.NewTicker(duration)
 	go func() {
+		prevOffset := offset
 		defer ticker.Stop()
-		//offsets := make([]uint64, 0)
 		for {
 			select {
 			case <-ctx.Done():
@@ -130,28 +130,11 @@ func startOffsetSyncer(ctx context.Context, kc v1.PrivateKeyValueServiceClient, 
 				} else {
 					offset = curr
 				}
-
-				//if offset+1 == curr {
-				//	offset = curr
-				//	if len(offsets) > 0 {
-				//		var i = 0
-				//		for ; i < len(offsets); i++ {
-				//			if offsets[i] != offset+1 {
-				//				break
-				//			} else {
-				//				offset++
-				//			}
-				//		}
-				//		if i-1 >= 0 {
-				//			offsets = offsets[i:]
-				//		}
-				//	}
-				//} else {
-				//	offsets = append(offsets, curr)
-				//	sortkeys.Uint64s(offsets)
-				//	continue
-				//}
 			case <-ticker.C:
+				if prevOffset == offset {
+					logrus.Debugf("[store-client]offset %v not changed", offset)
+					continue
+				}
 				if _, err := kc.Put(ctx, &v1.PutRequest{
 					Key:   offsetName,
 					Value: util.Uint64ToBytes(offset),
@@ -159,6 +142,7 @@ func startOffsetSyncer(ctx context.Context, kc v1.PrivateKeyValueServiceClient, 
 					logrus.Errorf("[store-client]put offset value %v error:%v", err, offset)
 				} else {
 					logrus.Debugf("[store-client]put offset value %v to %s success", offset, addr)
+					prevOffset = offset
 				}
 			}
 		}
