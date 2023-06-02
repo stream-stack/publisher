@@ -116,6 +116,8 @@ var subscribeUrl string
 func StartConsensus(ctx context.Context) {
 	virtualActorLifetime = viper.GetDuration("VirtualActorLifetime")
 	subscribeUrl = viper.GetString("SubscribeUrl")
+	logrus.Debugf("[virtual-actor]virtual actor lifetime:%v", virtualActorLifetime)
+	logrus.Debugf("[virtual-actor]subscribe url:%s", subscribeUrl)
 	go func() {
 		for {
 			select {

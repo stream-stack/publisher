@@ -34,7 +34,7 @@ func NewCommand() (*cobra.Command, context.Context, context.CancelFunc) {
 			rand.Seed(time.Now().UnixNano())
 			logrus.Debug("[config]env print:")
 			for _, s := range os.Environ() {
-				if strings.HasPrefix(s, "STREAM_DISPATCHER") {
+				if strings.HasPrefix(s, "STREAM_PUBLISHER") {
 					logrus.Debug(s)
 				}
 			}
@@ -50,7 +50,7 @@ func NewCommand() (*cobra.Command, context.Context, context.CancelFunc) {
 	}
 	store.InitFlags()
 
-	viper.AddConfigPath(`./config`)
+	viper.AddConfigPath(`./conf`)
 	viper.SetConfigName("config")
 	config.BuildFlags(command)
 	viper.SetEnvPrefix("stream_publisher")
