@@ -114,7 +114,7 @@ func startOffsetSyncer(ctx context.Context, kc v1.PrivateKeyValueServiceClient, 
 	if get.Value != nil {
 		offset = util.BytesToUint64(get.Value)
 	}
-	offsetCh := make(chan uint64, 3)
+	offsetCh := make(chan uint64, 1)
 	duration := viper.GetDuration("OffsetSyncInterval")
 	ticker := time.NewTicker(duration)
 	go func() {

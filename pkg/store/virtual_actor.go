@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-var request = make(chan func(actors map[string]*virtualActor))
+var request = make(chan func(actors map[string]*virtualActor), 1)
 
 type actorData struct {
 	e *v1.CloudEvent
@@ -26,7 +26,7 @@ type virtualActor struct {
 }
 
 func (a *virtualActor) start(ctx context.Context) {
-	a.signal = make(chan *v1.CloudEvent)
+	a.signal = make(chan *v1.CloudEvent, 1)
 	a.events = make([]*actorData, 0)
 	a.total = 3
 	lifetime := time.NewTimer(virtualActorLifetime)
