@@ -152,7 +152,7 @@ func startOffsetSyncer(ctx context.Context, kc v1.PrivateKeyValueServiceClient, 
 
 func getPublisherOffsetKey() []byte {
 	hostname, _ := os.Hostname()
-	return []byte(fmt.Sprintf("publisher-offset-%v", hostname))
+	return []byte(fmt.Sprintf("publisher/offset/%v", hostname))
 }
 
 func getStoreAddress(sets []*partition.Set) []string {
