@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"fmt"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -43,6 +42,9 @@ func (a *virtualActor) start(ctx context.Context) {
 				logrus.Debugf("[virtual-actor][%s]virtual actor timeout,will be closed", a.key)
 				return
 			case ev := <-a.signal:
+				if !lifetime.Stop() {
+					<-lifetime.C
+				}
 				lifetime.Reset(virtualActorLifetime)
 				//判断接收到的event是否达到共识要求(有超过半数),调用sender发送
 				if len(a.events) == 0 {
@@ -131,7 +133,7 @@ func StartConsensus(ctx context.Context) {
 }
 
 func BeginConsensus(ctx context.Context, ev *v1.CloudEvent) {
-	key := getKey(ev)
+	key := string(util.FormatKeyWithEvent(ev))
 	request <- func(actors map[string]*virtualActor) {
 		actor, ok := actors[key]
 		logrus.Debugf("[virtual-actor][%s]begin consensus", key)
@@ -142,8 +144,4 @@ func BeginConsensus(ctx context.Context, ev *v1.CloudEvent) {
 		}
 		actor.signal <- ev
 	}
-}
-
-func getKey(ev *v1.CloudEvent) string {
-	return fmt.Sprintf("%s/%s", ev.Source, ev.Id)
 }
